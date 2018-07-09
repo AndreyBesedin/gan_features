@@ -131,8 +131,9 @@ if opt.noise == 'uniform' then
 elseif opt.noise == 'normal' then
     noise_vis:normal(0, 1)
 end
-data = torch.load('./bedroom_real.t7')
-classifier = torch.load('./LSUN_real_data_classifier.t7')
+class = 'bedroom'
+data = torch.load('../Stream_image_classification/subsets/LSUN/100k_images_10_classes/'..class..'_real.t7')
+classifier = torch.load('../Stream_image_classification/models/classifiers/LSUN_real_data_classifier.t7')
 original_data_mean_sample = data:mean(1)
 original_data_std_sample = data:std(1)
 -- create closure to evaluate f(X) and df/dX of discriminator
@@ -239,3 +240,7 @@ for epoch = 1, opt.niter do
    print(('End of epoch %d / %d \t Time Taken: %.3f'):format(
             epoch, opt.niter, epoch_tm:time().real))
 end
+netD:claerState()
+netG:clearState()
+torch.save('../../Models/LSUN_generators/gan_on_features/'..class..'_D.t7', netD)
+torch.save('../../Models/LSUN_generators/gan_on_features/'..class..'_G.t7', netG)
