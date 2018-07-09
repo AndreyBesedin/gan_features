@@ -4,7 +4,7 @@ require 'optim'
 require 'cunn'
 require 'cudnn'
 require 'gnuplot'
-dofile('../Stream_image_classification/sup_functions.lua')
+dofile('./sup_functions.lua')
 opt = {
    dataset = 'lsun',       -- imagenet / lsun / folder
    batch_size = 100,

@@ -1,14 +1,14 @@
 require 'torch'
 require 'nn'
 require 'optim'
-
+dofile('./sup_functions.lua')
 opt = {
    dataset = 'lsun',       -- imagenet / lsun / folder
    batch_size = 128,
    nz = 100,               -- #  of dim for Z
    nThreads = 4,           -- #  of data loading threads to use
-   niter = 10,             -- #  of iter at starting learning rate
-   lr = 0.0002,            -- initial learning rate for adam
+   niter = 20,             -- #  of iter at starting learning rate
+   lr = 0.0001,            -- initial learning rate for adam
    beta1 = 0.5,            -- momentum term of adam
    ntrain = math.huge,     -- #  of examples per epoch. math.huge for full dataset
    display = 1,            -- display samples while training. 0 = false
@@ -16,6 +16,7 @@ opt = {
    gpu = 1,                -- gpu = 0 is CPU mode. gpu=X is GPU mode on GPU X
    name = 'experiment1',
    noise = 'normal',       -- uniform / normal
+   nb_classes = 10
 }
 
 -- one-line argument parser. parses enviroment variables to override the defaults
@@ -60,14 +61,16 @@ local function initialize_generator(noise_size, feature_size)
 --  generator:add(nn.BatchNormalization(512))
   generator:add(nn.Linear(512, feature_size))
 --  generator:add(nn.Tanh(true))
-  generator:apply(weights_init)
+  generator = require('weight-init')(generator, 'heuristic')
+  --generator:apply(weights_init)
   return generator
 end
 
 local function initialize_discriminator(feature_size)
   local discriminator = nn.Sequential()
   discriminator:add(nn.Linear(feature_size, feature_size + 128)):add(nn.ReLU(true))
-  discriminator:add(nn.Linear(feature_size + 128, 512)):add(nn.ReLU(true))
+--  discriminator:add(nn.BatchNormalization(feature_size + 128))
+  discriminator:add(nn.Linear(feature_size + 128, 512)):add(nn.ReLU(true))  
 --  discriminator:add(nn.BatchNormalization(512))
   discriminator:add(nn.Linear(512, 32)):add(nn.ReLU(true))
 --  discriminator:add(nn.BatchNormalization(32))
@@ -75,7 +78,8 @@ local function initialize_discriminator(feature_size)
   discriminator:add(nn.Linear(4, 1))
 --  discriminator:add(nn.Sigmoid())
   discriminator:add(nn.View(1))
-  discriminator:apply(weights_init)
+  discriminator = require('weight-init')(discriminator, 'heuristic')
+  --discriminator:apply(weights_init)
   return discriminator
 end  
 noise_size = 100
@@ -127,7 +131,8 @@ if opt.noise == 'uniform' then
 elseif opt.noise == 'normal' then
     noise_vis:normal(0, 1)
 end
-data = torch.load('../Stream_image_classification/subsets/LSUN/100k_images_10_classes/bedroom_real.t7')
+data = torch.load('./bedroom_real.t7')
+classifier = torch.load('./LSUN_real_data_classifier.t7')
 original_data_mean_sample = data:mean(1)
 original_data_std_sample = data:std(1)
 -- create closure to evaluate f(X) and df/dX of discriminator
@@ -182,6 +187,10 @@ local fGx = function(x)
 end
 
 -- train
+fake = netG:forward(noise_vis)
+testset = {}; testset.data = fake; testset.labels = torch.ones(fake:size(1))
+confusion_reconstructed = test_classifier(classifier, testset)
+print(confusion_reconstructed)
 for epoch = 1, opt.niter do
    epoch_tm:reset()
    local counter = 0
@@ -195,29 +204,31 @@ for epoch = 1, opt.niter do
 
       -- display
       counter = counter + 1
-      --if counter % 10 == 0 and opt.display then
-      --    local fake = netG:forward(noise_vis)
-      --    local real = get_batch(data, opt.batch_size)
-      --    disp.image(fake, {win=opt.display_id, title=opt.name})
-      --    disp.image(real, {win=opt.display_id * 3, title=opt.name})
-      --end
+      if counter % 10 == 0 and opt.display then
+         local fake = netG:forward(noise_vis)
+         local real = get_batch(data, opt.batch_size)
+         disp.image(fake, {win=opt.display_id, title=opt.name})
+         disp.image(real, {win=opt.display_id * 3, title=opt.name})
+      end
 
       -- logging
       if ((i-1) / opt.batch_size) % 1 == 0 then
-	 fake = netG:forward(noise_vis)
-	 local distance_fake_to_real = fake:mean(1):float()-original_data_mean_sample
-         mean_error = distance_fake_to_real:norm()
-	 local std_variation = fake:std(1):float() - original_data_std_sample
-	 std_error = std_variation:norm()
-	 print('Error of generated samples samples: ' .. mean_error .. '\nElement wise variation difference: ' .. std_error)
-         print(('Epoch: [%d][%8d / %8d]\t Time: %.3f  DataTime: %.3f  '
-                   .. '  Err_G: %.4f  Err_D: %.4f'):format(
-                 epoch, ((i-1) / opt.batch_size),
-                 math.floor(math.min(data:size(1), opt.ntrain) / opt.batch_size),
-                 tm:time().real, data_tm:time().real,
-                 errG and errG or -1, errD and errD or -1))
+--        netG:evaluate()
+	      fake = netG:forward(noise_vis)
+	      local distance_fake_to_real = fake:mean(1):float()-original_data_mean_sample
+        mean_error = distance_fake_to_real:norm()
+	      local std_variation = fake:std(1):float() - original_data_std_sample
+	      std_error = std_variation:norm()
+	      print('Error of generated samples samples: ' .. mean_error .. '\nElement wise variation difference: ' .. std_error)
+--        netG:training()
+      end
+      if (i-1)/opt.batch_size%100== 0 then 
+        testset.data = fake; testset.labels = torch.ones(fake:size(1))
+        confusion_reconstructed = test_classifier(classifier, testset)
+        print(confusion_reconstructed)
       end
    end
+
    paths.mkdir('checkpoints')
    parametersD, gradParametersD = nil, nil -- nil them to avoid spiking memory
    parametersG, gradParametersG = nil, nil
