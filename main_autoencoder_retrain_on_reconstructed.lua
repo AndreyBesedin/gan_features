@@ -81,7 +81,8 @@ end
 
 classifier = torch.load('../Stream_image_classification/models/classifiers/LSUN_real_data_classifier.t7')
 feature_size = 2048
-data = torch.load('../Stream_image_classification/subsets/LSUN/100k_images_10_classes/full_data_orig.t7')
+data = {}
+data.data = torch.load('../Stream_image_classification/subsets/LSUN/100k_images_10_classes/bedroom_real.t7')
 testset = torch.load('/home/besedin/workspace/Data/LSUN/data_t7/validation/extracted_features/full_dataset_10_classes.t7')
 confusion = test_classifier(classifier, testset)
 print(confusion)
@@ -146,7 +147,7 @@ end
 
 local function visualize_features(data, encoder)
   local to_plot = {}
-  for idx = 1, 10 do
+  for idx = 1, 1 do
     features = encoder:forward(data.data[{{1 + (idx-1)*100000, 1000 + (idx-1)*100000},{}}]:cuda()):float()
     to_plot[idx] = {features[{{},{1}}]:squeeze(), features[{{},{2}}]:squeeze(), 'with points'}
   end
@@ -155,6 +156,7 @@ end
 gnuplot.figure()
 reconstructed_data = {}
 noise_ = torch.CudaTensor(parameters:size(1))
+
 for epoch = 1, opt.niter do
   local counter = 0
   full_model:training()

@@ -7,7 +7,7 @@ opt = {
    batch_size = 128,
    nz = 100,               -- #  of dim for Z
    nThreads = 4,           -- #  of data loading threads to use
-   niter = 20,             -- #  of iter at starting learning rate
+   niter = 50,             -- #  of iter at starting learning rate
    lr = 0.0001,            -- initial learning rate for adam
    beta1 = 0.5,            -- momentum term of adam
    ntrain = math.huge,     -- #  of examples per epoch. math.huge for full dataset
@@ -131,7 +131,7 @@ if opt.noise == 'uniform' then
 elseif opt.noise == 'normal' then
     noise_vis:normal(0, 1)
 end
-class = 'bedroom'
+class = 'tower'
 data = torch.load('../Stream_image_classification/subsets/LSUN/100k_images_10_classes/'..class..'_real.t7')
 classifier = torch.load('../Stream_image_classification/models/classifiers/LSUN_real_data_classifier.t7')
 original_data_mean_sample = data:mean(1)
@@ -240,7 +240,7 @@ for epoch = 1, opt.niter do
    print(('End of epoch %d / %d \t Time Taken: %.3f'):format(
             epoch, opt.niter, epoch_tm:time().real))
 end
-netD:claerState()
+netD:clearState()
 netG:clearState()
 torch.save('../../Models/LSUN_generators/gan_on_features/'..class..'_D.t7', netD)
 torch.save('../../Models/LSUN_generators/gan_on_features/'..class..'_G.t7', netG)
